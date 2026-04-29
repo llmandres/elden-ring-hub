@@ -11,8 +11,8 @@
 #   - Push to main branch (auto-release on merge)
 #   - Manual workflow dispatch
 #
-# Required Secrets:
-#   - PUSH_TOKEN: GitHub PAT with repo and workflow permissions
+# Tokens: Uses the default GITHUB_TOKEN (no secret required).
+# Optionally set PUSH_TOKEN (PAT) if you need to bypass protections or chains that only react to PAT pushes.
 #
 # =============================================================================
 
@@ -120,7 +120,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          token: ${{ secrets.PUSH_TOKEN }}
+          token: ${{ secrets.PUSH_TOKEN || github.token }}
 
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
@@ -181,13 +181,13 @@ jobs:
     env:
       NEXT_VERSION: ${{ needs.plan.outputs.next_version }}
       VERSION_NO_V: ${{ needs.plan.outputs.version_no_v }}
-      GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
+      GH_TOKEN: ${{ secrets.PUSH_TOKEN || github.token }}
+      GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN || github.token }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: release-${{ needs.plan.outputs.next_version }}
-          token: ${{ secrets.PUSH_TOKEN }}
+          token: ${{ secrets.PUSH_TOKEN || github.token }}
 
       - name: Extract changelog for this release
         id: changelog
@@ -235,7 +235,7 @@ jobs:
       - name: Delete old release drafts
         uses: hugo19941994/delete-draft-releases@v3.0.0
         env:
-          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN || github.token }}
         with:
           threshold: "1s"
 
