@@ -57,7 +57,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - uses: taiki-e/install-action@921a4027af787cda265c4f334a0f7f89b21d72e9 # v2.75.8
+      - uses: taiki-e/install-action@1329c298aa20c3257846c9b2e0e55967df3e3c37 # v2.75.25
         with:
           tool: git-cliff
 
@@ -126,9 +126,9 @@ jobs:
         with:
           python-version-file: ".python-version"
 
-      - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
 
-      - uses: taiki-e/install-action@921a4027af787cda265c4f334a0f7f89b21d72e9 # v2.75.8
+      - uses: taiki-e/install-action@1329c298aa20c3257846c9b2e0e55967df3e3c37 # v2.75.25
         with:
           tool: git-cliff
 
