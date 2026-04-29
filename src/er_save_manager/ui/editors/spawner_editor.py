@@ -348,7 +348,9 @@ class SpawnerEditor:
             # One row per cycle: weapons/armor need a fresh gaitem entry each time (no stacking).
             for _ in range(spawn_cycles):
                 if item.category in (ItemCategory.WEAPON, ItemCategory.ARMOR):
-                    gaitem_handle = self._create_gaitem_entry(char, item, actual_item_id)
+                    gaitem_handle = self._create_gaitem_entry(
+                        char, item, actual_item_id
+                    )
                     if gaitem_handle is None:
                         CTkMessageBox.showerror(
                             "No free equipment slot",
@@ -380,9 +382,7 @@ class SpawnerEditor:
                 inventory.common_item_count += 1
                 inventory.acquisition_index_counter = acq_index + 1
                 char.inventory_held.acquisition_index_counter = acq_index + 1
-                char.inventory_storage_box.acquisition_index_counter = (
-                    acq_index + 1
-                )
+                char.inventory_storage_box.acquisition_index_counter = acq_index + 1
 
             self._merge_gaitem_game_data_acquired_id(char, actual_item_id)
             self._merge_menu_profile_item_id(char, actual_item_id)
