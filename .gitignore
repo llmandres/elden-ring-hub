@@ -1,0 +1,71 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.spec.bak
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# uv
+.uv/
+
+# Ruff / formatters / typecheck caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Cursor (local workspace metadata; optional if you sync settings)
+.cursor/
+
+# Environment and secrets
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PyInstaller / frozen builds output
+*.spec.bak
+
+# Project saves and backups — never commit real game saves
+*.sl2
+*.co2
+*.bak
+*.backup
+*.backups/
+
+/data/
+*.log
+
+# Root-level sandbox tests (scratch; not packaged app)
+/test
+
+# ---------------------------------------------------------------------------
+# One-off local experiments (never commit — keep repo clean on new remotes)
+# ---------------------------------------------------------------------------
+finalize.txt
+force_spawn.py
+inspect_*.py
+load_save*.txt
+test_spawn*.py
+test_ggd.py

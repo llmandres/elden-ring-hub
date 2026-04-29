@@ -1,0 +1,321 @@
+# =============================================================================
+# ER Save Manager - Automated Release Workflow
+# =============================================================================
+#
+# This workflow automates the release process:
+#   1. PLAN: Detect version changes from conventional commits
+#   2. CREATE: Bump version, update changelog, create release branch
+#   3. BUILD: Build platform artifacts (Linux AppImage, Windows exe)
+#   4. FINALIZE: Create PR, draft release with artifacts
+#
+# Triggers:
+#   - Push to main branch (auto-release on merge)
+#   - Manual workflow dispatch
+#
+# Required Secrets:
+#   - PUSH_TOKEN: GitHub PAT with repo and workflow permissions
+#
+# =============================================================================
+
+name: Create Release Draft
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# =============================================================================
+# Environment Variables (Shared across jobs via outputs)
+# =============================================================================
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Plan Release
+  # ---------------------------------------------------------------------------
+  # Determines if a release is needed by comparing current version with
+  # the next version calculated from conventional commits.
+  # ---------------------------------------------------------------------------
+  plan:
+    name: Plan Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      current_version: ${{ steps.get-versions.outputs.current_version }}
+      next_version: ${{ steps.get-versions.outputs.next_version }}
+      version_no_v: ${{ steps.get-versions.outputs.version_no_v }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: taiki-e/install-action@921a4027af787cda265c4f334a0f7f89b21d72e9 # v2.75.8
+        with:
+          tool: git-cliff
+
+      - name: Get current and next versions
+        id: get-versions
+        run: |
+          # Get current version from pyproject.toml
+          current_version=$(grep -Po '(?<=^version = ")[^"]*' pyproject.toml)
+          echo "current_version=v$current_version" >> "$GITHUB_OUTPUT"
+          
+          # Get next version from git-cliff (based on conventional commits)
+          next_version=$(git cliff --bumped-version --unreleased)
+          echo "next_version=$next_version" >> "$GITHUB_OUTPUT"
+          
+          # Also output version without 'v' prefix for artifact naming
+          version_no_v="${next_version#v}"
+          echo "version_no_v=$version_no_v" >> "$GITHUB_OUTPUT"
+          
+          echo "📌 Current version: v$current_version"
+          echo "📌 Next version: $next_version"
+
+      - name: Validate version tags
+        run: |
+          current_version="${{ steps.get-versions.outputs.current_version }}"
+          
+          # Check if the tag exists
+          if [ -z "$(git tag -l "$current_version")" ]; then
+            echo "❌ CRITICAL ERROR: Tag '$current_version' is missing!"
+            echo "---------------------------------------------------"
+            echo "git-cliff requires the LAST release to be tagged to calculate the NEXT release."
+            echo "Without this tag, it assumes this is the first ever release (0.1.0)."
+            echo ""
+            echo "To fix this, run:"
+            echo "  git tag $current_version <commit-hash-of-last-release>"
+            echo "  git push origin $current_version"
+            echo "---------------------------------------------------"
+            exit 1
+          else
+            echo "✅ Tag '$current_version' verified."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Create Release Branch
+  # ---------------------------------------------------------------------------
+  # Creates the release branch with version bump, changelog update,
+  # and prepares for artifact builds.
+  # ---------------------------------------------------------------------------
+  create-release-branch:
+    needs: plan
+    name: Create Release Branch
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    if: needs.plan.outputs.current_version != needs.plan.outputs.next_version
+    env:
+      NEXT_VERSION: ${{ needs.plan.outputs.next_version }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.PUSH_TOKEN }}
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version-file: ".python-version"
+
+      - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+
+      - uses: taiki-e/install-action@921a4027af787cda265c4f334a0f7f89b21d72e9 # v2.75.8
+        with:
+          tool: git-cliff
+
+      - name: Bump version and update changelog
+        run: |
+          # Bump version in pyproject.toml
+          uv run scripts/bump_version.py "$NEXT_VERSION"
+          
+          # Update uv.lock with new version
+          uv sync
+          
+          # Update changelog only if this version section doesn't already exist
+          # This allows manual edits to be preserved on subsequent runs
+          if ! grep -q "^## 📦 Release $NEXT_VERSION" CHANGELOG.md 2>/dev/null; then
+            git cliff --tag "$NEXT_VERSION" -o CHANGELOG.md
+          fi
+
+      - name: Commit and push release branch
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions"
+          git add pyproject.toml uv.lock CHANGELOG.md resources/version.txt resources/app.manifest src/er_save_manager/__init__.py
+          
+          # Check if there are staged changes
+          if git diff --staged --quiet; then
+            echo "📌 No changes to commit (version unchanged)"
+            echo "💡 Tip: Use conventional commits to trigger version bumps"
+            echo "   Examples: feat: add feature, fix: fix bug, docs: update docs"
+            exit 0
+          fi
+          
+          git commit -m "🚀 Release: Prepare ER Save Manager $NEXT_VERSION"
+          git push origin "HEAD:refs/heads/release-$NEXT_VERSION" --force
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Build Platform Artifacts
+  # ---------------------------------------------------------------------------
+  # Builds the application for each supported platform.
+  # Runs in parallel for faster builds.
+  # ---------------------------------------------------------------------------
+  build-artifacts:
+    needs:
+      - plan
+      - create-release-branch
+    name: Build ${{ matrix.build-name }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            build-name: Linux
+            artifact-name: er-save-manager-linux-release
+          - os: windows-latest
+            build-name: Windows
+            artifact-name: er-save-manager-windows-release
+    runs-on: ${{ matrix.os }}
+    if: needs.plan.outputs.current_version != needs.plan.outputs.next_version
+    env:
+      NEXT_VERSION: ${{ needs.plan.outputs.next_version }}
+      VERSION_NO_V: ${{ needs.plan.outputs.version_no_v }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: release-${{ needs.plan.outputs.next_version }}
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version-file: ".python-version"
+
+      - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+
+      - name: Install dependencies
+        run: uv sync --locked --dev
+
+      - name: Build Linux AppImage
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          uv run ./build-linux.sh
+          ./package-linux.sh
+
+      - name: Build Windows Executable
+        if: matrix.os == 'windows-latest'
+        run: uv run ./build-windows.py build
+
+      - name: Upload Linux artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: dist/linux-${{ env.VERSION_NO_V }}/er-save-manager.AppImage
+
+      - name: Upload Windows artifact
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: dist/windows-${{ env.VERSION_NO_V }}
+
+  # ---------------------------------------------------------------------------
+  # Job 4: Finalize Release
+  # ---------------------------------------------------------------------------
+  # Downloads all artifacts, creates PR and draft release.
+  # Uses helper scripts for cleaner, more maintainable logic.
+  # ---------------------------------------------------------------------------
+  finalize-release:
+    needs:
+      - plan
+      - create-release-branch
+      - build-artifacts
+    name: Finalize Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    if: needs.plan.outputs.current_version != needs.plan.outputs.next_version
+    env:
+      NEXT_VERSION: ${{ needs.plan.outputs.next_version }}
+      VERSION_NO_V: ${{ needs.plan.outputs.version_no_v }}
+      GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: release-${{ needs.plan.outputs.next_version }}
+          token: ${{ secrets.PUSH_TOKEN }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: artifacts/
+
+      - name: Prepare artifacts for release
+        run: |
+          chmod +x scripts/prepare_artifacts.sh
+          ./scripts/prepare_artifacts.sh "$NEXT_VERSION"
+
+      - name: Extract changelog for this release
+        id: changelog
+        run: |
+          chmod +x scripts/extract_changelog.sh
+          changelog=$(./scripts/extract_changelog.sh "$NEXT_VERSION")
+          
+          # Save to file for PR body
+          echo "$changelog" > release_changelog.txt
+          
+          # Also set as output for release notes
+          {
+            echo "content<<EOF"
+            echo "$changelog"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or update pull request
+        run: |
+          changelog=$(cat release_changelog.txt)
+          pr_title="🚀 Release: ER Save Manager $NEXT_VERSION"
+          
+          # Create PR body with unreleased banner (write to file to avoid YAML issues)
+          {
+            echo "## 🚧 UNRELEASED"
+            echo ""
+            echo "**This release is still under development.**"
+            echo "Changes in this PR will be included in the final release once merged."
+            echo ""
+            echo "---"
+            echo ""
+            echo "$changelog"
+          } > pr_body.txt
+          
+          pr_body=$(cat pr_body.txt)
+          
+          # Try to create PR first, if it fails because PR already exists, update it
+          if gh pr create -B main --title "$pr_title" -b "$pr_body" --head "release-$NEXT_VERSION" 2>/dev/null; then
+            echo "✅ Created new PR"
+          else
+            echo "ℹ️  PR already exists, updating..."
+            gh pr edit "release-$NEXT_VERSION" -b "$pr_body"
+          fi
+
+      - name: Delete old release drafts
+        uses: hugo19941994/delete-draft-releases@v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        with:
+          threshold: "1s"
+
+      - name: Create draft release with artifacts
+        run: |
+          chmod +x scripts/create_release.sh
+          ./scripts/create_release.sh "$NEXT_VERSION" "${{ steps.changelog.outputs.content }}"

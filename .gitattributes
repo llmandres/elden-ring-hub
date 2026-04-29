@@ -1,0 +1,8 @@
+# Normalize line endings; Python sources as LF keeps cross-platform commits consistent.
+* text=auto
+*.py text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
