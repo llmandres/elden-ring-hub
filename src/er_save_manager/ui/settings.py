@@ -92,7 +92,6 @@ class Settings:
             "last_save_path": "",
             "theme": "dark",
             "show_linux_save_warning": True,
-            "show_backup_pruning_warning": True,
             "compress_backups": True,
             # Legacy single-game auto-backup (kept for migration)
             "auto_backup_on_game_launch": False,

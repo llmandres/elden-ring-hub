@@ -136,6 +136,12 @@ class SpawnerEditor:
         self.entry_qty = ctk.CTkEntry(bot_frame, textvariable=self.qty_var, width=60)
         self.entry_qty.pack(side=ctk.RIGHT, padx=4, pady=6)
         ctk.CTkLabel(bot_frame, text="Qty:").pack(side=ctk.RIGHT, padx=4)
+        ctk.CTkLabel(
+            bot_frame,
+            text="(goods stack in one slot; weapons/armor = separate copies)",
+            font=("Segoe UI", 10),
+            text_color=("gray40", "gray65"),
+        ).pack(side=ctk.RIGHT, padx=(0, 6))
 
         self.load_database()
 
@@ -230,8 +236,9 @@ class SpawnerEditor:
         for o in range(0, len(data) - 3, 4):
             if struct.unpack_from("<I", data, o)[0] == full_item_id:
                 return
-        # Skip a small leading header (layout varies; do not clobber it)
-        start = 16 if len(data) > 20 else 0
+        # Skip a minimal header; search the rest so first-spawn-from-empty-save still
+        # finds a zero slot without requiring an in-game chest interaction first.
+        start = 8 if len(data) > 12 else 0
         for o in range(start, len(data) - 3, 4):
             if struct.unpack_from("<I", data, o)[0] == 0:
                 struct.pack_into("<I", data, o, full_item_id)
@@ -290,13 +297,14 @@ class SpawnerEditor:
         except (ValueError, TypeError):
             quantity = 1
 
-        # Weapons, armors and talismans are unique items (qty = 1)
-        if item.category in (
-            ItemCategory.WEAPON,
-            ItemCategory.ARMOR,
-            ItemCategory.TALISMAN,
-        ):
-            quantity = 1
+        # Stack size in ONE storage row (consumables/materials/goods/talismans).
+        # Weapons and armor cannot stack — each blade/plate needs its own gaitem + row.
+        if item.category in (ItemCategory.WEAPON, ItemCategory.ARMOR):
+            spawn_cycles = quantity
+            stack_qty = 1
+        else:
+            spawn_cycles = 1
+            stack_qty = max(1, min(999, quantity))
 
         # Create backup before any modification
         save_path = self.get_save_path()
@@ -305,7 +313,7 @@ class SpawnerEditor:
 
             manager = BackupManager(Path(save_path))
             manager.create_backup(
-                description=f"before_spawn_{item.name}_slot_{slot_idx + 1}",
+                description=f"before_spawn_{item.name}_x{quantity}_slot_{slot_idx + 1}",
                 operation="spawn_item",
                 save=save_file,
             )
@@ -319,58 +327,62 @@ class SpawnerEditor:
             full_msg = "Your grace chest storage is full in this save."
             actual_item_id = item.full_id
 
-            # Generate gaitem_handle and create a gaitem entry for weapons/armor
-            if item.category in (ItemCategory.WEAPON, ItemCategory.ARMOR):
-                gaitem_handle = self._create_gaitem_entry(char, item, actual_item_id)
-                if gaitem_handle is None:
-                    CTkMessageBox.showerror(
-                        "No free equipment slot",
-                        "No free gaitem slot in this save (all map entries appear in use). "
-                        "In-game, remove or store an extra weapon or armor, save, re-open "
-                        "this file in the editor, then try again.",
-                        parent=self.parent,
-                    )
-                    return
-            else:
-                # Direct handle (no gaitem row): use 0xB0 prefix for both goods and talismans;
-                # the client expects this for common_items without a Gaitem map entry.
-                gaitem_handle = (item.id & 0x00FFFFFF) | 0xB0000000
-
-            # Next slot is always index common_item_count; do not use last_used+1
-            # (gaps in the array are ignored; the game only reads the first count slots).
-            empty_inv_idx = inventory.common_item_count
-
-            if empty_inv_idx >= len(inventory.common_items):
-                CTkMessageBox.showerror("Full", full_msg, parent=self.parent)
-                return
-
-            # Acquisition index is a global counter; take the max across held + storage
-            max_acq = max(
-                char.inventory_held.acquisition_index_counter,
-                char.inventory_storage_box.acquisition_index_counter,
-            )
-            for inv_item in (
-                list(char.inventory_held.common_items)
-                + list(char.inventory_held.key_items)
-                + list(char.inventory_storage_box.common_items)
-                + list(char.inventory_storage_box.key_items)
-            ):
-                if (
-                    inv_item.gaitem_handle not in (0, 0xFFFFFFFF)
-                    and inv_item.acquisition_index > max_acq
+            def _max_acquisition_index() -> int:
+                mx = max(
+                    char.inventory_held.acquisition_index_counter,
+                    char.inventory_storage_box.acquisition_index_counter,
+                )
+                for inv_item in (
+                    list(char.inventory_held.common_items)
+                    + list(char.inventory_held.key_items)
+                    + list(char.inventory_storage_box.common_items)
+                    + list(char.inventory_storage_box.key_items)
                 ):
-                    max_acq = inv_item.acquisition_index
-            acq_index = max_acq + 1
+                    if (
+                        inv_item.gaitem_handle not in (0, 0xFFFFFFFF)
+                        and inv_item.acquisition_index > mx
+                    ):
+                        mx = inv_item.acquisition_index
+                return mx
 
-            # Write the new inventory item in memory
-            inventory.common_items[empty_inv_idx].gaitem_handle = gaitem_handle
-            inventory.common_items[empty_inv_idx].quantity = quantity
-            inventory.common_items[empty_inv_idx].acquisition_index = acq_index
+            # One row per cycle: weapons/armor need a fresh gaitem entry each time (no stacking).
+            for _ in range(spawn_cycles):
+                if item.category in (ItemCategory.WEAPON, ItemCategory.ARMOR):
+                    gaitem_handle = self._create_gaitem_entry(char, item, actual_item_id)
+                    if gaitem_handle is None:
+                        CTkMessageBox.showerror(
+                            "No free equipment slot",
+                            "No free gaitem slot in this save (all map entries appear in use). "
+                            "In-game, remove or store an extra weapon or armor, save, re-open "
+                            "this file in the editor, then try again.",
+                            parent=self.parent,
+                        )
+                        return
+                else:
+                    # Direct handle (no gaitem row): use 0xB0 prefix for goods and talismans;
+                    # the client expects this for common_items without a Gaitem map entry.
+                    gaitem_handle = (item.id & 0x00FFFFFF) | 0xB0000000
 
-            inventory.common_item_count += 1
-            inventory.acquisition_index_counter = acq_index + 1
-            char.inventory_held.acquisition_index_counter = acq_index + 1
-            char.inventory_storage_box.acquisition_index_counter = acq_index + 1
+                # Next slot is always index common_item_count (game reads count leading slots).
+                empty_inv_idx = inventory.common_item_count
+
+                if empty_inv_idx >= len(inventory.common_items):
+                    CTkMessageBox.showerror("Full", full_msg, parent=self.parent)
+                    return
+
+                max_acq = _max_acquisition_index()
+                acq_index = max_acq + 1
+
+                inventory.common_items[empty_inv_idx].gaitem_handle = gaitem_handle
+                inventory.common_items[empty_inv_idx].quantity = stack_qty
+                inventory.common_items[empty_inv_idx].acquisition_index = acq_index
+
+                inventory.common_item_count += 1
+                inventory.acquisition_index_counter = acq_index + 1
+                char.inventory_held.acquisition_index_counter = acq_index + 1
+                char.inventory_storage_box.acquisition_index_counter = (
+                    acq_index + 1
+                )
 
             self._merge_gaitem_game_data_acquired_id(char, actual_item_id)
             self._merge_menu_profile_item_id(char, actual_item_id)
@@ -414,10 +426,25 @@ class SpawnerEditor:
                 save_file.to_file(Path(save_path))
 
             file_hint = Path(save_path).name if save_path else "save"
+            if spawn_cycles > 1:
+                qty_line = (
+                    f"Added {spawn_cycles}× {item.name} (separate rolls) "
+                    f"for character {slot_idx + 1} in the grace chest.\n\n"
+                )
+            elif stack_qty > 1:
+                qty_line = (
+                    f"Added {stack_qty}× {item.name} "
+                    f"for character {slot_idx + 1} in the grace chest.\n\n"
+                )
+            else:
+                qty_line = (
+                    f"Added {item.name} for character {slot_idx + 1} "
+                    "in the grace chest.\n\n"
+                )
             CTkMessageBox.showinfo(
                 "Success",
-                f"Added {item.name} for character {slot_idx + 1} to the grace chest "
-                "(open Chest at a site of grace to see it).\n\n"
+                f"{qty_line}"
+                "(Open Chest at a site of grace to see entries.)\n\n"
                 f"File written: {file_hint}\n\n"
                 "Fully quit the game, reload this save, then check the chest.",
                 parent=self.parent,

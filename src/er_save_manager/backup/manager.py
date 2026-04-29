@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import logging
 import re
 import shutil
 import zipfile
@@ -14,6 +15,26 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from er_save_manager.parser import Save
+
+logger = logging.getLogger(__name__)
+
+# Same log file pattern as transfer.character_ops (append to er_save_manager.log)
+_have_file = False
+for _h in logger.handlers:
+    if isinstance(_h, logging.FileHandler) and getattr(_h, "baseFilename", "").endswith(
+        "er_save_manager.log"
+    ):
+        _have_file = True
+        break
+if not _have_file:
+    try:
+        _fh = logging.FileHandler("er_save_manager.log", encoding="utf-8")
+        _fh.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+        )
+        logger.addHandler(_fh)
+    except Exception:
+        pass
 
 
 @dataclass
@@ -233,42 +254,20 @@ class BackupManager:
                 pruned_backups = self.get_backups_to_prune(keep_count=max_backups)
                 if pruned_backups:
                     self.prune_backups(keep_count=max_backups)
-
-                    # Show warning if setting is enabled
-                    if settings.get("show_backup_pruning_warning", True):
-                        self._show_pruning_warning(max_backups, pruned_backups)
+                    preview = ", ".join(b.filename for b in pruned_backups[:15])
+                    if len(pruned_backups) > 15:
+                        preview += f", …(+{len(pruned_backups) - 15} more)"
+                    logger.info(
+                        "Backup cap (%s): removed %d old file(s): %s",
+                        max_backups,
+                        len(pruned_backups),
+                        preview,
+                    )
         except Exception:
             # Silently fail if settings can't be accessed
             pass
 
         return backup_path, pruned_backups
-
-    def _show_pruning_warning(
-        self, max_backups: int, pruned_backups: list[BackupMetadata]
-    ):
-        """Show warning about pruned backups using messagebox."""
-        try:
-            from tkinter import messagebox
-
-            # Format the list of deleted backups
-            deleted_list = "\n".join(
-                f"  • {backup.filename}" for backup in pruned_backups
-            )
-
-            message = (
-                f"Backup limit of {max_backups} reached.\n\n"
-                f"The following old backups were permanently deleted:\n\n{deleted_list}\n\n"
-                f"You can disable this warning in Settings > Backups > "
-                f"'Show warning when backups are automatically deleted'"
-            )
-
-            messagebox.showwarning(
-                "Backups Pruned",
-                message,
-            )
-        except Exception:
-            # Silently fail if messagebox can't be shown (headless mode, etc)
-            pass
 
     def create_pre_write_backup(self, save: Save, operation: str) -> Path:
         """
@@ -283,11 +282,12 @@ class BackupManager:
         Returns:
             Path to the backup file
         """
-        return self.create_backup(
+        backup_path, _ = self.create_backup(
             description="before_modification",
             operation=operation,
             save=save,
         )
+        return backup_path
 
     def list_backups(self) -> list[BackupMetadata]:
         """
