@@ -207,10 +207,11 @@ jobs:
 
       - name: Create or update pull request
         run: |
+          set -euo pipefail
           changelog=$(cat release_changelog.txt)
           pr_title="🚀 Release: ER Save Manager $NEXT_VERSION"
-          
-          # Create PR body with unreleased banner (write to file to avoid YAML issues)
+          head_branch="release-${NEXT_VERSION}"
+
           {
             echo "## 🚧 UNRELEASED"
             echo ""
@@ -221,15 +222,29 @@ jobs:
             echo ""
             echo "$changelog"
           } > pr_body.txt
-          
+
           pr_body=$(cat pr_body.txt)
-          
-          # Try to create PR first, if it fails because PR already exists, update it
-          if gh pr create -B main --title "$pr_title" -b "$pr_body" --head "release-$NEXT_VERSION" 2>/dev/null; then
-            echo "✅ Created new PR"
+          repo="$GITHUB_REPOSITORY"
+          owner="$GITHUB_REPOSITORY_OWNER"
+
+          pr_num=$(gh pr list --repo "$repo" --base main --state open \
+            --head "${owner}:${head_branch}" \
+            --json number \
+            --jq 'try .[0].number catch ""' 2>/dev/null || true)
+
+          if [ -z "$pr_num" ] || [ "$pr_num" = "null" ]; then
+            pr_num=$(gh pr list --repo "$repo" --base main --state open \
+              --head "$head_branch" \
+              --json number \
+              --jq 'try .[0].number catch ""' 2>/dev/null || true)
+          fi
+
+          if [ -n "$pr_num" ] && [ "$pr_num" != "null" ]; then
+            echo "Updating existing PR #$pr_num..."
+            gh pr edit "$pr_num" -b "$pr_body"
           else
-            echo "ℹ️  PR already exists, updating..."
-            gh pr edit "release-$NEXT_VERSION" -b "$pr_body"
+            echo "Creating PR from $head_branch..."
+            gh pr create -B main --title "$pr_title" -b "$pr_body" --head "$head_branch"
           fi
 
       - name: Delete old release drafts
