@@ -53,11 +53,11 @@ Older documentation and modules may still describe a wider toolset (fixer, telep
 
 ## Installation
 
-Download the latest **Windows** build from your repository’s **[Releases]** page (`EldenRing Hub.exe` inside the published folder/ZIP).
+**Distribution is a single `.zip` from [GitHub Releases](https://github.com/YOUR_ORG/YOUR_REPO/releases)** (replace with your fork/org URL). There is no installer: you download the zip GitHub hosts, extract it, and run **`EldenRing Hub.exe`** from that folder.
 
-- **Linux**: AppImage and scripts may still exist in the repo history; verify `build-linux.sh` and CI for your fork.
+Maintainers build the Windows folder locally (see [RELEASE.md](RELEASE.md)), zip it, and **attach that zip to the GitHub release**. End users do not need anything else from CI or other stores.
 
-*(Replace the Releases URL in your fork: `https://github.com/YOUR_ORG/YOUR_REPO/releases`.)*
+If you need **Linux**, run from source or build on Linux using [DEVELOPMENT.md](DEVELOPMENT.md)—this project does not rely on AppImage or extra assets in the default release flow.
 
 ---
 
@@ -83,9 +83,9 @@ uv run python run_gui.py
 
 ---
 
-## Publishing a Windows .exe release
+## Publishing releases (.zip on GitHub)
 
-See **[RELEASE.md](RELEASE.md)** for version bumps, cx_Freeze build, and attaching artifacts to GitHub Releases.
+See **[RELEASE.md](RELEASE.md)** for version bumps, building with cx_Freeze, zipping the output, and attaching the **`zip`** to GitHub Releases (what users download).
 
 Summary:
 

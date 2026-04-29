@@ -47,34 +47,18 @@ pyinstaller --clean --noconfirm \
     --hidden-import PIL._tkinter_finder \
     --hidden-import PIL.ImageTk \
     --hidden-import PIL._imagingtk \
+    --hidden-import er_save_manager.platform \
+    --hidden-import er_save_manager.backup.manager \
+    --hidden-import er_save_manager.backup.process_monitor \
+    --hidden-import er_save_manager.transfer.character_ops \
     --hidden-import er_save_manager.ui \
     --hidden-import er_save_manager.ui.gui \
+    --hidden-import er_save_manager.ui.toast \
     --hidden-import er_save_manager.ui.editors \
-    --hidden-import er_save_manager.platform \
-    --hidden-import er_save_manager.ui.editors.equipment_editor \
-    --hidden-import er_save_manager.ui.editors.stats_editor \
-    --hidden-import er_save_manager.ui.editors.character_info_editor \
-    --hidden-import er_save_manager.ui.editors.inventory_editor \
-    --hidden-import er_save_manager.ui.dialogs \
-    --hidden-import er_save_manager.ui.dialogs.character_details \
+    --hidden-import er_save_manager.ui.editors.runes_editor \
+    --hidden-import er_save_manager.ui.editors.spawner_editor \
+    --hidden-import er_save_manager.ui.editors.upgrader_editor \
     --hidden-import er_save_manager.ui.dialogs.save_selector \
-    --hidden-import er_save_manager.ui.dialogs.preset_browser \
-    --hidden-import er_save_manager.ui.dialogs.browser_submission \
-    --hidden-import er_save_manager.ui.dialogs.backup_pruning_warning \
-    --hidden-import er_save_manager.ui.widgets \
-    --hidden-import er_save_manager.ui.widgets.scrollable_frame \
-    --hidden-import er_save_manager.ui.tabs \
-    --hidden-import er_save_manager.ui.tabs.character_management_tab \
-    --hidden-import er_save_manager.ui.tabs.save_inspector_tab \
-    --hidden-import er_save_manager.ui.tabs.appearance_tab \
-    --hidden-import er_save_manager.ui.tabs.world_state_tab \
-    --hidden-import er_save_manager.ui.tabs.steamid_patcher_tab \
-    --hidden-import er_save_manager.ui.tabs.event_flags_tab \
-    --hidden-import er_save_manager.ui.tabs.gestures_regions_tab \
-    --hidden-import er_save_manager.ui.tabs.hex_editor_tab \
-    --hidden-import er_save_manager.ui.tabs.advanced_tools_tab \
-    --hidden-import er_save_manager.ui.tabs.backup_manager_tab \
-    --hidden-import er_save_manager.ui.map_view \
     $readline_flag \
     --optimize 2 \
     --strip \

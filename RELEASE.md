@@ -1,6 +1,6 @@
-# Publishing a Windows release (.exe)
+# Publishing a Windows release (.zip via GitHub)
 
-This project ships a GUI built with **cx_Freeze** on Windows. Build on a Windows machine (no cross-compilation).
+End users download **one `.zip` from GitHub Releases** containing the frozen app (`EldenRing Hub.exe` and dependencies). This project ships that GUI built with **cx_Freeze** on Windows. Build on a Windows machine (no cross-compilation).
 
 ## Prerequisites
 
@@ -30,14 +30,16 @@ Output directory (example for `0.14.0`):
 
 `dist/windows-0.14.0/er-save-manager_0.14.0/`
 
-Inside you will find **`EldenRing Hub.exe`** (plus DLLs and `lib/`). Distribute the **entire folder**, or zip it and attach the zip to the GitHub Release.
+Inside you will find **`EldenRing Hub.exe`** (plus DLLs and `lib/`). Zip the **`er-save-manager_<version>/`** folder (or the whole `dist/windows-<version>/` contents—whatever you want users to extract). **That zip is the only file most users need.**
 
 ## GitHub Release checklist
 
 1. Tag the commit (e.g. `v0.14.0`).
-2. Create a Release from that tag on GitHub.
-3. Upload the **zipped build folder** (or the full `dist/windows-*` tree as produced by the build).
+2. Create a **Release** on GitHub from that tag.
+3. **Attach the `.zip`** as the main download asset. Users grab this from the Releases page; nothing else is required from automation.
 4. In the release notes, repeat the **online / anti-cheat** warning from the README (offline play, Seamless Coop at user’s own risk).
+
+Optional mirrors (for example Nexus Mods) can republish the same zip; GitHub Releases remains the canonical download for this fork unless you document otherwise.
 
 ## Notes
 

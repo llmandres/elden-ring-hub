@@ -1,5 +1,5 @@
 #!/bin/bash
-# Create GitHub release with artifacts
+# Create GitHub draft release (optionally with Linux/Windows artifacts under artifacts/)
 #
 # Usage: ./create_release.sh <version> <changelog_content>
 # Example: ./create_release.sh v1.3.0 "$(cat changelog.txt)"
@@ -58,19 +58,24 @@ if [ -d "artifacts/er-save-manager-windows-release" ]; then
     ARTIFACTS+=("$WINDOWS_ZIP")
 fi
 
+# Create the draft release (notes only if no binaries were built in CI)
 if [ ${#ARTIFACTS[@]} -eq 0 ]; then
-    echo "Error: No artifacts found to upload" >&2
-    exit 1
+    echo "Creating draft release $VERSION with no attachments (changelog only)..."
+    gh release create \
+        --target "$COMMIT" \
+        --title "$VERSION" \
+        --notes "$CHANGELOG_CONTENT" \
+        --draft \
+        "$VERSION"
+else
+    echo "Creating draft release $VERSION with ${#ARTIFACTS[@]} artifact(s)..."
+    gh release create \
+        --target "$COMMIT" \
+        --title "$VERSION" \
+        --notes "$CHANGELOG_CONTENT" \
+        --draft \
+        "$VERSION" \
+        "${ARTIFACTS[@]}"
 fi
-
-# Create the draft release
-echo "Creating draft release $VERSION with ${#ARTIFACTS[@]} artifact(s)..."
-gh release create \
-    --target "$COMMIT" \
-    --title "$VERSION" \
-    --notes "$CHANGELOG_CONTENT" \
-    --draft \
-    "$VERSION" \
-    "${ARTIFACTS[@]}"
 
 echo "✅ Release $VERSION created successfully!"

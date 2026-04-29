@@ -32,21 +32,23 @@ uv run pytest -v
 
 ## Build
 
+**Public releases for players:** ship a single **Windows `.zip`** built locally and uploaded to **[GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)**. That zip is what users download and extract ([RELEASE.md](RELEASE.md)).
+
 ### Windows (cx_Freeze)
 
 ```bash
 uv run python build-windows.py build
 ```
 
-Outputs to `dist/windows-{version}/` (executable **`EldenRing Hub.exe`** inside `er-save-manager_{version}`). See **[RELEASE.md](RELEASE.md)** for tagging and attaching builds to GitHub Releases.
+Outputs to `dist/windows-{version}/` (executable **`EldenRing Hub.exe`** inside `er-save-manager_{version}`). Zip that output and attach the zip to the release.
 
-### Linux (PyInstaller)
+### Linux (PyInstaller, optional)
 
 ```bash
 uv run ./build-linux.sh
 ```
 
-Outputs to `dist/linux-{version}/`
+Outputs to `dist/linux-{version}/` — developer use or custom packaging only; **not** the default end-user artifact for this fork.
 
 **Note:** PyInstaller does not cross-compile. Build on the target platform.
 
