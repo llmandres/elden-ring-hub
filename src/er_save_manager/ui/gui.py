@@ -320,7 +320,6 @@ class SaveManagerGUI:
         _reload_btn.pack(side=tk.LEFT, padx=3, pady=4)
         self._file_load_buttons.append(_reload_btn)
 
-
         self.main_content = ctk.CTkFrame(
             self.root,
             corner_radius=12,
@@ -440,9 +439,7 @@ class SaveManagerGUI:
         )
         select_frame.grid(row=0, column=0, sticky="ew", padx=8, pady=(6, 5))
 
-        ctk.CTkLabel(select_frame, text="Slot:").pack(
-            side=ctk.LEFT, padx=(8, 10)
-        )
+        ctk.CTkLabel(select_frame, text="Slot:").pack(side=ctk.LEFT, padx=(8, 10))
 
         self.char_slot_var = ctk.StringVar(value="1")
         self._slot_combo = ctk.CTkComboBox(
@@ -476,7 +473,9 @@ class SaveManagerGUI:
             border_width=1,
             border_color=("gray82", "#1e3a8a"),
         )
-        self._slot_load_hint_frame.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 5))
+        self._slot_load_hint_frame.grid(
+            row=1, column=0, sticky="ew", padx=8, pady=(0, 5)
+        )
         ctk.CTkLabel(
             self._slot_load_hint_frame,
             text=(
@@ -550,8 +549,10 @@ class SaveManagerGUI:
             return
 
         profile = self._active_profile()
-        if profile and profile.process_name and self.is_game_running(
-            profile.process_name
+        if (
+            profile
+            and profile.process_name
+            and self.is_game_running(profile.process_name)
         ):
             CTkMessageBox.showwarning(
                 "Game running",
@@ -624,7 +625,6 @@ class SaveManagerGUI:
             self.show_toast(f"Imported into slot {to_slot + 1}.", duration=2500)
         except Exception as e:
             CTkMessageBox.showerror("Import failed", str(e), parent=self.root)
-
 
     def load_character_for_edit(self):
         """Load character data into editors"""

@@ -1,16 +1,19 @@
 import struct
 import tkinter as tk
-import customtkinter as ctk
 from pathlib import Path
 
-from er_save_manager.ui.messagebox import CTkMessageBox
-from er_save_manager.ui.utils import bind_mousewheel
-from er_save_manager.data.item_database import get_item_database, ItemCategory
+import customtkinter as ctk
+
+from er_save_manager.data.item_database import ItemCategory, get_item_database
 from er_save_manager.parser.slot_rebuild import rebuild_slot
 from er_save_manager.parser.world import GaitemGameDataEntry
+from er_save_manager.ui.messagebox import CTkMessageBox
+from er_save_manager.ui.utils import bind_mousewheel
+
 
 class SpawnerEditor:
     """Spawn items into the grace chest storage (site of grace)."""
+
     def __init__(
         self,
         parent,
@@ -46,7 +49,9 @@ class SpawnerEditor:
             font=("Segoe UI", 11, "bold"),
         ).grid(row=0, column=0, sticky="ew", padx=4, pady=(2, 4))
 
-        warn_shell = ctk.CTkFrame(frame, fg_color=("gray92", "#1f2937"), corner_radius=8)
+        warn_shell = ctk.CTkFrame(
+            frame, fg_color=("gray92", "#1f2937"), corner_radius=8
+        )
         warn_shell.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 4))
         ctk.CTkLabel(
             warn_shell,
@@ -64,19 +69,23 @@ class SpawnerEditor:
 
         search_frame = ctk.CTkFrame(frame, fg_color="transparent")
         search_frame.grid(row=2, column=0, sticky="ew", padx=4, pady=0)
-        
+
         ctk.CTkLabel(search_frame, text="Search Item:").pack(side=ctk.LEFT)
         self.search_var.trace_add("write", lambda *args: self.refresh_list())
-        ctk.CTkEntry(search_frame, textvariable=self.search_var, width=250).pack(side=ctk.LEFT, padx=5)
-        
-        ctk.CTkButton(search_frame, text="Load Database", command=self.load_database, width=120).pack(side=ctk.RIGHT, padx=5)
+        ctk.CTkEntry(search_frame, textvariable=self.search_var, width=250).pack(
+            side=ctk.LEFT, padx=5
+        )
+
+        ctk.CTkButton(
+            search_frame, text="Load Database", command=self.load_database, width=120
+        ).pack(side=ctk.RIGHT, padx=5)
 
         # Listbox for items
         list_container = ctk.CTkFrame(frame)
         list_container.grid(row=3, column=0, sticky="nsew", padx=4, pady=5)
         list_container.grid_rowconfigure(0, weight=1)
         list_container.grid_columnconfigure(0, weight=1)
-        
+
         scrollbar = tk.Scrollbar(list_container)
         mode = ctk.get_appearance_mode()
         if mode == "Light":
@@ -89,11 +98,11 @@ class SpawnerEditor:
             listbox_select_bg = "#c9a0dc"
 
         self.listbox = tk.Listbox(
-            list_container, 
-            yscrollcommand=scrollbar.set, 
-            font=("Consolas", 11), 
-            bg=listbox_bg, 
-            fg=listbox_fg, 
+            list_container,
+            yscrollcommand=scrollbar.set,
+            font=("Consolas", 11),
+            bg=listbox_bg,
+            fg=listbox_fg,
             selectbackground=listbox_select_bg,
             relief=tk.FLAT,
             exportselection=False,
@@ -102,57 +111,63 @@ class SpawnerEditor:
         scrollbar.grid(row=0, column=1, sticky="ns")
         scrollbar.config(command=self.listbox.yview)
         bind_mousewheel(self.listbox)
-        self.listbox.bind('<<ListboxSelect>>', self.on_item_select)
+        self.listbox.bind("<<ListboxSelect>>", self.on_item_select)
 
         bot_frame = ctk.CTkFrame(frame, fg_color=("gray86", "gray25"))
         bot_frame.grid(row=4, column=0, sticky="ew", padx=4, pady=4)
-        
-        self.lbl_selected = ctk.CTkLabel(bot_frame, text="Selected: None", font=("Segoe UI", 12, "bold"))
+
+        self.lbl_selected = ctk.CTkLabel(
+            bot_frame, text="Selected: None", font=("Segoe UI", 12, "bold")
+        )
         self.lbl_selected.pack(side=ctk.LEFT, padx=8, pady=6)
-        
+
         self.btn_spawn = ctk.CTkButton(
-            bot_frame, 
-            text="Spawn Item", 
-            command=self.apply_spawn, 
-            state="disabled", 
-            fg_color="#28a745", 
+            bot_frame,
+            text="Spawn Item",
+            command=self.apply_spawn,
+            state="disabled",
+            fg_color="#28a745",
             hover_color="#218838",
-            width=120
+            width=120,
         )
         self.btn_spawn.pack(side=ctk.RIGHT, padx=8, pady=6)
-        
+
         self.qty_var = ctk.StringVar(value="1")
         self.entry_qty = ctk.CTkEntry(bot_frame, textvariable=self.qty_var, width=60)
         self.entry_qty.pack(side=ctk.RIGHT, padx=4, pady=6)
         ctk.CTkLabel(bot_frame, text="Qty:").pack(side=ctk.RIGHT, padx=4)
-        
+
         self.load_database()
 
     def load_database(self):
         """Load items from the database"""
         self.all_items.clear()
-        
+
         # Load Talismans, Weapons, Armors, and Goods (Materials)
         allowed_categories = [
-            ItemCategory.TALISMAN, 
-            ItemCategory.WEAPON, 
+            ItemCategory.TALISMAN,
+            ItemCategory.WEAPON,
             ItemCategory.ARMOR,
-            ItemCategory.GOODS
+            ItemCategory.GOODS,
         ]
-        
+
         for item in self.db.items:
             if item.category in allowed_categories:
                 # Exclude empty or debug items
-                if item.name and not item.name.startswith("Unknown") and not item.name.startswith("?"):
+                if (
+                    item.name
+                    and not item.name.startswith("Unknown")
+                    and not item.name.startswith("?")
+                ):
                     self.all_items.append(item)
-                
+
         self.refresh_list()
 
     def refresh_list(self):
         """Refresh the listbox based on search filter"""
         self.listbox.delete(0, tk.END)
         search_query = self.search_var.get().lower()
-        
+
         self.displayed_items = []
         for item in self.all_items:
             if search_query in item.name.lower():
@@ -164,10 +179,10 @@ class SpawnerEditor:
                     cat_str = "Armor"
                 elif item.category == ItemCategory.GOODS:
                     cat_str = "Material/Item"
-                    
+
                 self.listbox.insert(tk.END, f"[{cat_str}] {item.name}")
                 self.displayed_items.append(item)
-                
+
         self.lbl_selected.configure(text="Selected: None")
         self.btn_spawn.configure(state="disabled")
 
@@ -229,10 +244,10 @@ class SpawnerEditor:
         if not selection:
             self.btn_spawn.configure(state="disabled")
             return
-            
+
         idx = selection[0]
         item = self.displayed_items[idx]
-        
+
         self.lbl_selected.configure(text=f"Selected: {item.name}")
         self.btn_spawn.configure(state="normal")
 
@@ -276,13 +291,18 @@ class SpawnerEditor:
             quantity = 1
 
         # Weapons, armors and talismans are unique items (qty = 1)
-        if item.category in (ItemCategory.WEAPON, ItemCategory.ARMOR, ItemCategory.TALISMAN):
+        if item.category in (
+            ItemCategory.WEAPON,
+            ItemCategory.ARMOR,
+            ItemCategory.TALISMAN,
+        ):
             quantity = 1
 
         # Create backup before any modification
         save_path = self.get_save_path()
         if save_path:
             from er_save_manager.backup.manager import BackupManager
+
             manager = BackupManager(Path(save_path))
             manager.create_backup(
                 description=f"before_spawn_{item.name}_slot_{slot_idx + 1}",
@@ -374,7 +394,9 @@ class SpawnerEditor:
             # Re-parse the slot so subsequent spawns see a consistent in-memory state
             try:
                 from io import BytesIO
+
                 from er_save_manager.parser.user_data_x import UserDataX
+
                 slot_buf = BytesIO(
                     bytes(
                         save_file._raw_data[abs_offset : abs_offset + len(slot_bytes)]
@@ -403,6 +425,7 @@ class SpawnerEditor:
 
         except Exception as e:
             import traceback
+
             traceback.print_exc()
             CTkMessageBox.showerror(
                 "Error", f"Failed to spawn item: {e}", parent=self.parent

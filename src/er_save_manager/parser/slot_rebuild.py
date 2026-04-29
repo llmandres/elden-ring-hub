@@ -328,12 +328,7 @@ def rebuild_slot_with_map(slot: UserDataX) -> tuple[bytes, list[dict[str, Any]]]
         rest = getattr(slot, "rest", None) or b""
         s_old = getattr(slot, "structured_byte_len", None)
         s_new = current_size
-        if (
-            s_old is not None
-            and s_new is not None
-            and rest
-            and s_new > s_old
-        ):
+        if s_old is not None and s_new is not None and rest and s_new > s_old:
             growth = s_new - s_old
             if growth > len(rest):
                 raise ValueError(
@@ -352,9 +347,7 @@ def rebuild_slot_with_map(slot: UserDataX) -> tuple[bytes, list[dict[str, Any]]]
             def _write_trailing() -> None:
                 buf.write(rest_for_pad[:padding_needed])
                 if len(rest_for_pad) < padding_needed:
-                    buf.write(
-                        b"\x00" * (padding_needed - len(rest_for_pad))
-                    )
+                    buf.write(b"\x00" * (padding_needed - len(rest_for_pad)))
 
             write_section("trailing_from_rest", _write_trailing)
         else:

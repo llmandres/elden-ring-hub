@@ -4,8 +4,8 @@ import os
 import platform as platform_module
 import shutil
 import subprocess
-import webbrowser
 import tkinter as tk
+import webbrowser
 
 
 def int_from_tk_str_var(sv, default: int = 0) -> int:
